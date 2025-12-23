@@ -29,6 +29,10 @@ const VideoModel = () => {
 
   const { user, room } = useSelector((state) => state.conference);
 
+  const cleanup = useCallback(() => {
+    // logic for your custom cleanup (e.g., UI resets)
+    console.log("Custom cleanup executed");
+  }, []);
   // --- Signaling Logic ---
   useEffect(() => {
     if (!user || !room) return;
@@ -118,6 +122,7 @@ const VideoModel = () => {
         window.localStream.getTracks().forEach((track) => track.stop());
         window.localStream = null;
       }
+      cleanup();
     };
   }, [user?.id, room, dispatch]);
 
