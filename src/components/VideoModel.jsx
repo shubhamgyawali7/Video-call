@@ -171,7 +171,11 @@ const VideoModel = () => {
       dispatch(addPeer({ socketId, userId, username, stream: remoteStream }));
     };
 
-    peersRef.current.set(socketId, { connection: pc, username });
+    peersRef.current.set(socketId, {
+      connection: pc,
+      username,
+      candidateQueue: [],
+    });
 
     if (shouldCreateOffer) {
       const offer = await pc.createOffer();
@@ -220,6 +224,10 @@ const VideoModel = () => {
       // 3. Set Remote Description (Offer)
       await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
 
+      peer.candidateQueue.forEach((cand) =>
+        pc.addIceCandidate(new RTCIceCandidate(cand))
+      );
+      peer.candidateQueue = [];
       // 4. Create Answer
       const answer = await pc.createAnswer();
 
@@ -234,42 +242,36 @@ const VideoModel = () => {
   };
 
   const handleAnswer = async (data) => {
-    // 1. Get the specific connection for the user who sent the answer
     const peer = peersRef.current.get(data.from);
-
-    if (!peer || !peer.connection) {
-      console.warn(`No peer connection found for answer from: ${data.from}`);
-      return;
-    }
+    if (!peer || !peer.connection) return;
 
     const pc = peer.connection;
 
-    pc.onsignalingstatechange = () => {
-      console.log("Signaling state changed answer:", pc.signalingState);
-      // Implement logic here to react to state changes, e.g., enable/disable buttons,
-      // or prevent certain operations until the state is correct.
-    };
-
-    // 2. Apply your guard logic
     if (pc.signalingState === "have-local-offer") {
       try {
-        console.log(
-          "Current signaling state of HandleAnswer:",
-          pc.signalingState
-        );
-        console.log("Data of HandelAnwer=>", data);
         await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+
+        // --- ADD THIS PART ---
+        // Process queued candidates now that the remote description is set
+        if (peer.candidateQueue && peer.candidateQueue.length > 0) {
+          console.log(
+            `Processing ${peer.candidateQueue.length} queued candidates for ${data.from}`
+          );
+          peer.candidateQueue.forEach((cand) =>
+            pc
+              .addIceCandidate(new RTCIceCandidate(cand))
+              .catch((e) => console.error("Error adding queued candidate", e))
+          );
+          peer.candidateQueue = []; // Clear the queue
+        }
+        // ----------------------
+
         console.log(
           `Successfully transitioned to stable state for: ${data.from}`
         );
       } catch (error) {
         console.error("Failed to set remote answer description:", error);
       }
-    } else {
-      // This is where your previous "duplicate boxes" were likely coming from
-      console.warn(
-        `Received a redundant answer from ${data.from}. Current state is already: ${pc.signalingState}`
-      );
     }
   };
 
@@ -280,9 +282,10 @@ const VideoModel = () => {
         // Ensure we have a remote description before adding candidates
         if (peer.connection.remoteDescription) {
           await peer.connection.addIceCandidate(
-            new RTCIceCandidate(data.candidate) 
+            new RTCIceCandidate(data.candidate)
           );
         } else {
+          peer.candidateQueue.push(data.candidate);
           // Optional: Queue candidates if remoteDescription isn't ready yet
           console.warn(
             "Remote description not set yet, candidate ignored or queued"
