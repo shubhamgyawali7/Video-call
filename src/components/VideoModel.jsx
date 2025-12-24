@@ -136,10 +136,24 @@ const VideoModel = () => {
   ) => {
     if (peersRef.current.has(socketId)) return;
 
+    // const pc = new RTCPeerConnection({
+    //   iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    // });
     const pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        {
+          // Free relay servers from Open Relay Project
+          urls: [
+            "turn:openrelay.metered.ca:80",
+            "turn:openrelay.metered.ca:443",
+            "turn:openrelay.metered.ca:443?transport=tcp",
+          ],
+          username: "openrelayproject",
+          credential: "openrelayprojectsecret",
+        },
+      ],
     });
-
     stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
     pc.onicecandidate = (e) => {
@@ -263,9 +277,17 @@ const VideoModel = () => {
     const peer = peersRef.current.get(data.from);
     if (peer && data.candidate) {
       try {
-        await peer.connection.addIceCandidate(
-          new RTCIceCandidate(data.candidate)
-        );
+        // Ensure we have a remote description before adding candidates
+        if (peer.connection.remoteDescription) {
+          await peer.connection.addIceCandidate(
+            new RTCIceCandidate(data.candidate) 
+          );
+        } else {
+          // Optional: Queue candidates if remoteDescription isn't ready yet
+          console.warn(
+            "Remote description not set yet, candidate ignored or queued"
+          );
+        }
       } catch (e) {
         console.error("ICE Error", e);
       }

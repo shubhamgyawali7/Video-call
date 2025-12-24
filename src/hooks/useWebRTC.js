@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from "react";
 
 export const useWebRTC = () => {
   const [localStream, setLocalStream] = useState(null);
@@ -15,28 +15,44 @@ export const useWebRTC = () => {
       setLocalStream(stream);
       return stream;
     } catch (error) {
-      console.error('Error accessing media devices:', error);
-      throw new Error('Failed to access camera/microphone');
+      console.error("Error accessing media devices:", error);
+      throw new Error("Failed to access camera/microphone");
     }
   };
 
-  const createPeerConnection = (configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }) => {
+  // const createPeerConnection = (configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }) => {
+  // return new RTCPeerConnection(configuration);
+  // };
+  const createPeerConnection = (
+    configuration = {
+      iceServers: [
+        {
+          urls: "stun:stun.l.google.com:19302",
+        },
+        {
+          urls: "turn:your-turn-server-address.com:3478", // This is the relay
+          username: "your_username",
+          credential: "your_password",
+        },
+      ],
+    }
+  ) => {
     return new RTCPeerConnection(configuration);
   };
 
   const addTracksToPeer = (peerConnection, stream) => {
-    stream.getTracks().forEach(track => {
+    stream.getTracks().forEach((track) => {
       peerConnection.addTrack(track, stream);
     });
   };
 
   const replaceVideoTrack = async (newTrack) => {
     const promises = [];
-    
+
     peers.forEach(async (peer) => {
-      const sender = peer.connection.getSenders().find(s => 
-        s.track && s.track.kind === 'video'
-      );
+      const sender = peer.connection
+        .getSenders()
+        .find((s) => s.track && s.track.kind === "video");
       if (sender) {
         promises.push(sender.replaceTrack(newTrack));
       }
@@ -73,28 +89,28 @@ export const useWebRTC = () => {
     try {
       const screenStream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
-        audio: true
+        audio: true,
       });
-      
+
       screenStreamRef.current = screenStream;
       const videoTrack = screenStream.getVideoTracks()[0];
-      
+
       await replaceVideoTrack(videoTrack);
-      
+
       videoTrack.onended = () => {
         stopScreenShare();
       };
-      
+
       return screenStream;
     } catch (error) {
-      console.error('Error starting screen share:', error);
+      console.error("Error starting screen share:", error);
       throw error;
     }
   };
 
   const stopScreenShare = async () => {
     if (screenStreamRef.current) {
-      screenStreamRef.current.getTracks().forEach(track => track.stop());
+      screenStreamRef.current.getTracks().forEach((track) => track.stop());
       screenStreamRef.current = null;
     }
 
@@ -106,14 +122,14 @@ export const useWebRTC = () => {
 
   const cleanup = () => {
     if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
-    }
-    
-    if (screenStreamRef.current) {
-      screenStreamRef.current.getTracks().forEach(track => track.stop());
+      localStream.getTracks().forEach((track) => track.stop());
     }
 
-    peers.forEach(peer => {
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach((track) => track.stop());
+    }
+
+    peers.forEach((peer) => {
       if (peer.connection) {
         peer.connection.close();
       }
@@ -140,6 +156,6 @@ export const useWebRTC = () => {
     startScreenShare,
     stopScreenShare,
     setPeers,
-    cleanup
+    cleanup,
   };
 };
