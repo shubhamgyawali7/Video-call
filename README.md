@@ -52,18 +52,3 @@ npm run dev
 
 
 The app should now be running on `http://localhost:3000`.
-
-## 📖 Usage
-
-1. Open the application in your browser.
-2. Allow camera and microphone permissions when prompted.
-3. Share the Room ID or the URL with a friend.
-4. Once they join, the video stream will start automatically.
-
-## 🤝 Contributing
-
-Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://www.google.com/search?q=https://github.com/shubhamgyawali7/Video-call/issues).
-
----
-
-**Note:** If the repository is yours and it is set to **Private**, I cannot read the file directly. You would need to make the repository **Public** or copy the content here for me to analyze it.
