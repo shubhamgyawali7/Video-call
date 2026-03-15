@@ -35,10 +35,10 @@ export default function Room() {
 
   if (!isReady) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-white text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-          <p>Loading Conference...</p>
+      <div className="min-h-screen bg-[#0a0d14] flex items-center justify-center">
+        <div className="text-center flex flex-col items-center gap-4">
+          <div className="w-[52px] h-[52px] rounded-full border-4 border-indigo-500/20 border-t-indigo-500 animate-spin-slow" />
+          <p className="text-slate-400 text-[15px] font-medium">Joining Conference...</p>
         </div>
       </div>
     );

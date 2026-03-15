@@ -35,13 +35,8 @@ const conferenceSlice = createSlice({
       };
     },
     removePeer: (state, action) => {
-      console.log("Before Peers=>", state.peers);
-      // action.payload should be the socketId of the user who left
-      state.peers = state.peers.filter(
-        (peer) => peer.socketId !== action.payload
-      );
-
-      console.log("After Peers=>", state.peers);
+      // action.payload is the socketId
+      delete state.peers[action.payload];
     },
   },
 });

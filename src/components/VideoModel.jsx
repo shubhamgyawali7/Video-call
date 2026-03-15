@@ -10,7 +10,9 @@ import {
 } from "@/store/conferenceSlice.js";
 import VideoGrid from "./VideoGrid";
 import ControlPanel from "./ControlPanel";
+import ChatSidebar from "./ChatSidebar";
 import { useRouter } from "next/navigation";
+import { FiVideo, FiUsers, FiCopy, FiCheck } from "react-icons/fi";
 
 const VideoModel = () => {
   // --- UI States ---
@@ -19,6 +21,7 @@ const VideoModel = () => {
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const router = useRouter();
   const dispatch = useDispatch();
@@ -90,13 +93,14 @@ const VideoModel = () => {
         async (data) => await handleIceCandidate(data)
       );
 
-      socket.on("user-left", (socketId) => {
-        const peer = peersRef.current.get(socketId);
+      socket.on("user-left", (data) => {
+        const idToRemove = typeof data === "object" ? data.socketId : data;
+        const peer = peersRef.current.get(idToRemove);
         if (peer) {
-          peer.connection.close();
-          peersRef.current.delete(socketId);
-          dispatch(removePeer(socketId));
+          if (peer.connection) peer.connection.close();
+          peersRef.current.delete(idToRemove);
         }
+        dispatch(removePeer(idToRemove));
       });
     };
 
@@ -377,16 +381,94 @@ const VideoModel = () => {
     router.push("/");
   }, [localStream, router]);
 
+  const peers = useSelector((state) => state.conference.peers || {});
+  const participantCount = Object.keys(peers).length + (localStream ? 1 : 0);
+
+  const copyRoomId = () => {
+    if (!room) return;
+    navigator.clipboard.writeText(room).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const sendChatMessage = (message) => {
+    if (!message.trim()) return;
+    socket.emit("chat-message", {
+      roomId: room,
+      message: message.trim(),
+      userId: user?.id,
+      username: user?.username,
+    });
+  };
+
   return (
-    <div className="h-screen bg-gray-100 flex flex-col relative">
-      {/* Header Info */}
-      <div className="absolute top-4 left-4 z-20 bg-black/50 text-white p-2 rounded">
-        <p className="text-sm font-bold">Room: {room}</p>
-        <p className="text-xs">User: {user?.username}</p>
+    <div className="h-screen bg-[#0a0d14] flex flex-col overflow-hidden">
+      {/* Top Header */}
+      <header className="h-[60px] min-h-[60px] flex items-center justify-between px-5 z-40 shrink-0
+                         bg-[#0a0d14]/90 backdrop-blur-xl border-b border-white/[0.06]">
+        {/* Brand */}
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center
+                          bg-gradient-to-br from-indigo-500 to-violet-600 shadow-[0_0_12px_rgba(99,102,241,0.4)]">
+            <FiVideo size={16} color="white" />
+          </div>
+          <span className="font-bold text-base text-slate-100">NexMeet</span>
+        </div>
+
+        {/* Right side controls */}
+        <div className="flex items-center gap-2.5">
+          {/* Live badge */}
+          <div className="flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
+            <span className="text-[11px] text-emerald-500 font-semibold tracking-wide">LIVE</span>
+          </div>
+
+          {/* Room ID copy */}
+          <button onClick={copyRoomId} title="Copy Room ID"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg cursor-pointer transition-all
+                       bg-indigo-500/10 border border-indigo-500/20 text-indigo-400
+                       text-xs font-semibold tracking-wide
+                       hover:bg-indigo-500/20 hover:border-indigo-500/40">
+            {copied ? <FiCheck size={12} className="text-emerald-500" /> : <FiCopy size={12} />}
+            <span className={copied ? "text-emerald-500" : "text-indigo-400"}>
+              {copied ? 'Copied!' : room}
+            </span>
+          </button>
+
+          {/* Participant count */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg
+                          bg-white/5 border border-white/[0.07]">
+            <FiUsers size={12} className="text-slate-500" />
+            <span className="text-xs text-slate-400 font-medium">{participantCount}</span>
+          </div>
+
+          {/* Avatar */}
+          <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0
+                          bg-gradient-to-br from-indigo-500 to-violet-600
+                          text-[13px] font-bold text-white shadow-[0_0_10px_rgba(99,102,241,0.3)]">
+            {user?.username?.[0]?.toUpperCase() || '?'}
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content Row */}
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Video Grid Area */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <VideoGrid localStream={localStream} user={user} />
+        </div>
+
+        {/* Chat Sidebar */}
+        {showChat && (
+          <ChatSidebar
+            onSendMessage={sendChatMessage}
+            onClose={() => setShowChat(false)}
+          />
+        )}
       </div>
 
-      <VideoGrid localStream={localStream} user={user} />
-
+      {/* Floating Control Panel */}
       <ControlPanel
         isAudioOn={isAudioOn}
         isVideoOn={isVideoOn}
@@ -394,26 +476,12 @@ const VideoModel = () => {
         showChat={showChat}
         onToggleAudio={toggleAudio}
         onToggleVideo={toggleVideo}
-        onToggleScreenShare={() =>
-          alert("Screen sharing implementation pending.")
-        }
+        onToggleScreenShare={toggleScreenShare}
         onToggleChat={() => setShowChat(!showChat)}
         onLeave={leaveRoom}
+        room={room}
+        participantCount={participantCount}
       />
-
-      {/* Basic Chat Overlay Placeholder */}
-      {showChat && (
-        <div className="absolute right-0 top-0 h-full w-80 bg-white shadow-2xl z-30 p-4">
-          <h2 className="font-bold border-b pb-2">Chat</h2>
-          <button
-            onClick={() => setShowChat(false)}
-            className="text-xs text-red-500"
-          >
-            Close
-          </button>
-          {/* Chat message list and input would go here */}
-        </div>
-      )}
     </div>
   );
 };

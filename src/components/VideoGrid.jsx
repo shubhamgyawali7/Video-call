@@ -2,34 +2,19 @@
 
 import { useEffect, useRef } from "react";
 import { useSelector } from "react-redux";
+import { FiUser } from "react-icons/fi";
 
-// 1. Keep this outside the main component
+/* ── Single video tile ── */
 const VideoElement = ({ stream, username, isLocal }) => {
   const videoRef = useRef(null);
 
   useEffect(() => {
-    if (stream) {
-      console.log(
-        `Stream for ${username} tracks:`,
-        stream.getTracks().map((t) => `${t.kind}: ${t.enabled}`)
-      );
-
-      // Check if the stream is active
-      if (stream.active === false) {
-        console.warn(`Stream for ${username} is inactive!`);
-      }
-    }
     const video = videoRef.current;
-    // Standard assignment logic
     if (video && stream instanceof MediaStream) {
       video.srcObject = stream;
-
-      // If the video is already ready, play it immediately
       if (video.readyState >= 2) {
         video.play().catch((e) => console.error("Immediate play error:", e));
       }
-
-      // 3. Ensure the video plays once metadata is loaded
       video.onloadedmetadata = () => {
         video.play().catch((e) => console.error("Video play error:", e));
       };
@@ -37,41 +22,80 @@ const VideoElement = ({ stream, username, isLocal }) => {
   }, [stream]);
 
   return (
-    <div className="relative bg-black rounded-lg overflow-hidden">
+    <div className="relative rounded-2xl overflow-hidden bg-[#0d1117] aspect-video
+                    border border-transparent transition-all duration-300
+                    hover:border-indigo-500/40 hover:shadow-[0_0_20px_rgba(99,102,241,0.2)]">
       <video
-        className="rounded border w-full max-w-[800px] aspect-video object-cover"
-        ref={videoRef} // This now correctly points to the top-level ref
+        ref={videoRef}
         autoPlay
         playsInline
         muted={Boolean(isLocal)}
+        className="w-full h-full object-cover block"
       />
-      <div className="absolute bottom-2 left-2 bg-black/50 px-2 py-1 rounded text-white text-xs">
-        {username} {isLocal ? "(You)" : ""}
+      {/* Bottom gradient */}
+      <div className="absolute inset-x-0 bottom-0 h-16
+                      bg-gradient-to-t from-black/75 to-transparent pointer-events-none" />
+      {/* Name badge */}
+      <div className="absolute bottom-2.5 left-3 flex items-center gap-1.5">
+        {isLocal && (
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]" />
+        )}
+        <span className="text-white text-xs font-semibold drop-shadow">
+          {username}{isLocal ? " (You)" : ""}
+        </span>
       </div>
     </div>
   );
 };
 
+/* ── Loading placeholder tile ── */
+const LoadingTile = ({ username }) => (
+  <div className="relative rounded-2xl overflow-hidden aspect-video
+                  bg-gradient-to-br from-[#111827] to-[#1a2035]
+                  border border-white/5
+                  flex flex-col items-center justify-center gap-3">
+    <div className="w-11 h-11 rounded-full bg-indigo-500/15 border border-indigo-500/20
+                    flex items-center justify-center">
+      <FiUser size={20} className="text-indigo-400" />
+    </div>
+    <div className="text-center">
+      <p className="text-slate-400 text-sm font-medium">{username}</p>
+      <p className="text-slate-600 text-xs mt-0.5">Connecting...</p>
+    </div>
+    {/* Pulse ring */}
+    <div className="absolute w-11 h-11 rounded-full border-2 border-indigo-500/30 animate-pulse-glow" />
+  </div>
+);
+
+/* ── Empty state ── */
+const EmptyState = () => (
+  <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-600">
+    <div className="w-16 h-16 rounded-full bg-indigo-500/5 border-2 border-dashed border-indigo-500/20
+                    flex items-center justify-center">
+      <FiUser size={26} className="text-indigo-900" />
+    </div>
+    <p className="text-sm">Waiting for camera access...</p>
+  </div>
+);
+
+/* ── Grid layout helper ── */
+const getGridCols = (count) => {
+  if (count === 1) return "grid-cols-1 max-w-3xl mx-auto";
+  if (count === 2) return "grid-cols-2";
+  if (count <= 4) return "grid-cols-2";
+  if (count <= 6) return "grid-cols-3";
+  return "grid-cols-4";
+};
+
 const VideoGrid = ({ localStream, user }) => {
-  // Use a default empty object to prevent mapping errors
   const peers = useSelector((state) => state.conference.peers || {});
   const allPeers = Object.entries(peers);
-
-  const totalParticipants = allPeers.length + (localStream ? 1 : 0);
-
-  const getGridClass = () => {
-    if (totalParticipants === 1) return "grid-cols-1";
-    if (totalParticipants === 2) return "grid-cols-1 md:grid-cols-2";
-    if (totalParticipants <= 4) return "grid-cols-1 md:grid-cols-2";
-    if (totalParticipants <= 6)
-      return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3";
-    return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
-  };
+  const total = allPeers.length + (localStream ? 1 : 0);
 
   return (
-    <div className="flex-1 p-4 overflow-y-auto h-[200px]">
-      <div className={`grid gap-4 ${getGridClass()}`}>
-        {/* Render Local User - ALWAYS provide a unique key */}
+    <div className="flex-1 overflow-y-auto p-6 pb-28">
+      {total === 0 && <EmptyState />}
+      <div className={`grid gap-4 ${getGridCols(total)}`}>
         {localStream && user && (
           <VideoElement
             key={`local-${user.id || "me"}`}
@@ -80,32 +104,18 @@ const VideoGrid = ({ localStream, user }) => {
             isLocal={true}
           />
         )}
-
-        {/* Render Peers with Validation */}
-        {allPeers.map(([socketId, peer]) => {
-          // Verify it's a valid MediaStream to prevent Ref assignment crashes
-          const hasValidStream = peer.stream instanceof MediaStream;
-
-          if (!hasValidStream) {
-            return (
-              <div
-                key={socketId}
-                className="rounded border bg-gray-900 aspect-video flex items-center justify-center text-white"
-              >
-                Loading {peer.username}...
-              </div>
-            );
-          }
-
-          return (
+        {allPeers.map(([socketId, peer]) =>
+          peer.stream instanceof MediaStream ? (
             <VideoElement
               key={socketId}
               stream={peer.stream}
               username={peer.username}
               isLocal={false}
             />
-          );
-        })}
+          ) : (
+            <LoadingTile key={socketId} username={peer.username} />
+          )
+        )}
       </div>
     </div>
   );
