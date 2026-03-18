@@ -58,11 +58,18 @@ const VideoModel = () => {
 
       socket.emit("join-room", {
         roomId: room,
-        userId: user.id,
+        userId: user.id || socket.id,
         username: user.username,
       });
 
+      console.log(`[Socket] Joining room: ${room} as ${user.username}`);
+
+      socket.on("connect_error", (err) => {
+        console.error("[Socket] Connection Error:", err.message);
+      });
+
       socket.on("room-users", (users) => {
+        console.log("[Socket] Existing users in room:", users);
         users.forEach((u) => {
           dispatch(
             addPeer({
@@ -84,14 +91,26 @@ const VideoModel = () => {
           true,
           stream
         );
+        console.log(`[Socket] User joined: ${userData.username} (${userData.socketId})`);
       });
 
-      socket.on("offer", async (data) => await handleOffer(data, stream));
-      socket.on("answer", async (data) => await handleAnswer(data));
-      socket.on(
-        "ice-candidate",
-        async (data) => await handleIceCandidate(data)
-      );
+      socket.on("offer", async (data) => {
+        console.log(`[WebRTC] Received offer from ${data.from}`);
+        await handleOffer(data, stream);
+      });
+      socket.on("answer", async (data) => {
+        console.log(`[WebRTC] Received answer from ${data.from}`);
+        await handleAnswer(data);
+      });
+      socket.on("ice-candidate", async (data) => {
+        console.log(`[WebRTC] Received ICE candidate from ${data.from}`);
+        await handleIceCandidate(data);
+      });
+
+      socket.on("chat-message", (data) => {
+        console.log("[Socket] New chat message received:", data);
+        dispatch(addChatMessage(data));
+      });
 
       socket.on("user-left", (data) => {
         const idToRemove = typeof data === "object" ? data.socketId : data;
@@ -158,7 +177,7 @@ const VideoModel = () => {
         socket.emit("ice-candidate", {
           to: socketId,
           candidate: e.candidate,
-          from: socket.id,
+          from: user.username, // Using username for easier debugging in logs
         });
       }
     };
