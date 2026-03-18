@@ -63,7 +63,7 @@ const VideoConference = () => {
   const connectSocket = () => {
     if (!user || !room) return;
 
-    const socket = io(process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001');
+    const socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001');
     socketRef.current = socket;
 
     socket.on('connect', () => {
@@ -101,7 +101,14 @@ const VideoConference = () => {
   const createPeerConnection = async (socket, socketId, userId, username, shouldCreateOffer) => {
     if (!localStream) return;
 
-    const connection = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    const connection = new RTCPeerConnection({
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" },
+        { urls: "stun:global.stun.twilio.com:3478" }
+      ],
+    });
 
     // Add local tracks
     localStream.getTracks().forEach(track => connection.addTrack(track, localStream));

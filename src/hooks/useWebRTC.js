@@ -26,14 +26,10 @@ export const useWebRTC = () => {
   const createPeerConnection = (
     configuration = {
       iceServers: [
-        {
-          urls: "stun:stun.l.google.com:19302",
-        },
-        {
-          urls: "turn:your-turn-server-address.com:3478", // This is the relay
-          username: "your_username",
-          credential: "your_password",
-        },
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" },
+        { urls: "stun:global.stun.twilio.com:3478" }
       ],
     }
   ) => {
