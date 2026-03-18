@@ -182,8 +182,23 @@ const VideoModel = () => {
       }
     };
 
+    pc.oniceconnectionstatechange = () => {
+      console.log(`[WebRTC] ICE Connection State for ${username}: ${pc.iceConnectionState}`);
+      if (pc.iceConnectionState === "connected") {
+        console.log(`%c[WebRTC] SUCCESS: P2P Connection established with ${username}`, "color: #10b981; font-weight: bold;");
+      }
+      if (pc.iceConnectionState === "failed" || pc.iceConnectionState === "disconnected") {
+        console.warn(`[WebRTC] Connection problem with ${username}: ${pc.iceConnectionState}`);
+      }
+    };
+
+    pc.onsignalingstatechange = () => {
+      console.log(`[WebRTC] Signaling State for ${username}: ${pc.signalingState}`);
+    };
+
     pc.ontrack = (e) => {
       const remoteStream = e.streams[0];
+      console.log(`[WebRTC] Receiving remote track from ${username}`, e.track.kind);
       dispatch(addPeer({ socketId, userId, username, stream: remoteStream }));
     };
 
@@ -308,7 +323,7 @@ const VideoModel = () => {
           );
         }
       } catch (e) {
-        console.error("ICE Error", e);
+        console.error(`[WebRTC] ICE Candidate Error for ${data.from}:`, e);
       }
     }
   };
